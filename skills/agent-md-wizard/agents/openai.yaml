@@ -1,0 +1,4 @@
+interface:
+  display_name: "AGENT.MD Wizard"
+  short_description: "向导式检测仓库并生成或更新中文 AGENT.MD 文档"
+  default_prompt: "Use $agent-md-wizard to inspect this repository, guide me one step at a time, preview the draft, and then write AGENT.MD."
