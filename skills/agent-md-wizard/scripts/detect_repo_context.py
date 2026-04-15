@@ -315,7 +315,8 @@ def detect_python(root: Path, files: list[Path], result: dict) -> None:
             unique_append(result["commands"]["dev"], "streamlit run app.py")
             unique_append(result["confidence_notes"], "检测到 Streamlit 依赖，开发启动命令使用通用入口 app.py 作为候选。")
         elif "fastapi" in pyproject_text.lower():
-            unique_append(result["confidence_notes"], "检测到 FastAPI，但未可靠识别入口模块，请向用户确认启动命令。")
+            unique_append(result["commands"]["dev"], "uvicorn main:app --reload")
+            unique_append(result["confidence_notes"], "检测到 FastAPI，已推断启动命令为 uvicorn main:app --reload；若入口模块不同请更正。")
 
 
 def detect_go(root: Path, files: list[Path], result: dict) -> None:
@@ -423,6 +424,20 @@ def detect_repo_shape(root: Path, files: list[Path], result: dict) -> None:
         kind = "library"
         unique_append(result["confidence_notes"], "根据命令信号推测该仓库更像库项目，请向用户确认。")
 
+    if topology == "monorepo":
+        sub_package_files = [
+            path.parent for path in files
+            if path.name in {"package.json", "pyproject.toml", "go.mod", "Cargo.toml"}
+            and path.parent != root
+        ]
+        if sub_package_files:
+            unique_append(
+                result["confidence_notes"],
+                f"检测到 monorepo 结构（含 {len(sub_package_files)} 个子包），"
+                "各子包可能有独立命令，根目录命令可能为 workspace 级别过滤命令（如 pnpm --filter pkg dev），"
+                "请在向导中确认实际使用的命令是否需要按包拆分。",
+            )
+
     result["repo_shape"] = {
         "kind": kind,
         "topology": topology,
@@ -493,7 +508,11 @@ def main() -> int:
     detect_repo_shape(root, files, result)
 
     if not result["languages"]:
-        unique_append(result["confidence_notes"], "未检测到明确技术栈，需要通过向导显式收集项目类型和命令。")
+        unique_append(
+            result["confidence_notes"],
+            "未检测到明确技术栈（支持 Node.js/Python/Go/Rust），"
+            "请在向导中显式告知语言、框架及包管理器（如 Java/Maven、.NET/C#、PHP/Composer、Ruby/Bundler 等）。",
+        )
 
     for category, commands in result["commands"].items():
         if not commands:

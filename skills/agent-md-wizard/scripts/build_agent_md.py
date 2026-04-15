@@ -341,10 +341,17 @@ def main() -> int:
         sys.stdout.write(markdown)
         return 0
 
-    if output_path.exists() and not args.force:
-        sys.stderr.write(f"Output file already exists: {output_path}\n")
-        sys.stderr.write("Re-run with --force after explicit confirmation.\n")
-        return 1
+    if output_path.exists():
+        if not args.force:
+            sys.stderr.write(f"Output file already exists: {output_path}\n")
+            sys.stderr.write("Re-run with --force after explicit confirmation.\n")
+            return 1
+        if sys.stdin.isatty():
+            sys.stderr.write(f"Warning: overwriting existing file: {output_path}\n")
+            sys.stderr.write("Confirm overwrite? [y/N] ")
+            if input().strip().lower() != "y":
+                sys.stderr.write("Aborted.\n")
+                return 1
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(markdown, encoding="utf-8")

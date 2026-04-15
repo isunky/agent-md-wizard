@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile skills/agent-md-wizard/scripts/detect_repo_context.py)",
+      "Bash(python -m py_compile skills/agent-md-wizard/scripts/build_agent_md.py)",
+      "Bash(git push *)"
+    ]
+  }
+}
