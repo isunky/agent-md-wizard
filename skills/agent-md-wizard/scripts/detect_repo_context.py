@@ -9,6 +9,11 @@ import sys
 from pathlib import Path
 
 try:
+    from .constants import KIND_LABELS, TOPOLOGY_LABELS
+except ImportError:
+    from constants import KIND_LABELS, TOPOLOGY_LABELS  # type: ignore
+
+try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover
     tomllib = None
@@ -123,8 +128,8 @@ def normalize_text(path: Path) -> str:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         return path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        return ""
+    except OSError as e:
+        raise RuntimeError(f"Failed to read {path}: {e}") from e
 
 
 def iter_repo_files(root: Path):
@@ -136,14 +141,17 @@ def iter_repo_files(root: Path):
         ]
         current_path = Path(current_root)
         for filename in filenames:
-            yield current_path / filename
+            file_path = current_path / filename
+            if os.path.islink(file_path):
+                continue
+            yield file_path
 
 
 def load_json(path: Path) -> dict:
     try:
-        return json.loads(normalize_text(path) or "{}")
-    except json.JSONDecodeError:
-        return {}
+        return json.loads(normalize_text(path))
+    except (json.JSONDecodeError, RuntimeError) as e:
+        raise RuntimeError(f"Failed to parse JSON from {path}: {e}") from e
 
 
 def load_toml(path: Path) -> dict:
@@ -415,19 +423,10 @@ def detect_repo_shape(root: Path, files: list[Path], result: dict) -> None:
         kind = "library"
         unique_append(result["confidence_notes"], "根据命令信号推测该仓库更像库项目，请向用户确认。")
 
-    labels = {
-        "application": "应用",
-        "service": "服务",
-        "library": "库",
-        "full-stack": "全栈",
-        "unknown": "待确认项目",
-        "single-repo": "单仓",
-        "monorepo": "多仓/Monorepo",
-    }
     result["repo_shape"] = {
         "kind": kind,
         "topology": topology,
-        "summary": f"{labels.get(topology, topology)} {labels.get(kind, kind)}",
+        "summary": f"{TOPOLOGY_LABELS.get(topology, topology)} {KIND_LABELS.get(kind, kind)}",
     }
 
 

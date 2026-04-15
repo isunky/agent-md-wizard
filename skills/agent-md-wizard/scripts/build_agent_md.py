@@ -6,6 +6,11 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    from .constants import KIND_LABELS, TOPOLOGY_LABELS
+except ImportError:
+    from constants import KIND_LABELS, TOPOLOGY_LABELS  # type: ignore
+
 
 DEFAULT_STYLE_RULES = [
     "优先沿用仓库现有目录结构、命名方式和依赖约定，避免无收益的大范围重构。",
@@ -29,29 +34,28 @@ DEFAULT_DANGEROUS_COMMANDS = [
     "terraform destroy",
 ]
 
-KIND_LABELS = {
-    "application": "应用",
-    "service": "服务",
-    "library": "库",
-    "full-stack": "全栈",
-    "unknown": "项目",
-}
-
-TOPOLOGY_LABELS = {
-    "single-repo": "单仓",
-    "monorepo": "多仓/Monorepo",
-    "unknown": "待确认",
-}
-
 
 def load_json_arg(value: str):
     stripped = value.strip()
     if stripped.startswith("{") or stripped.startswith("["):
-        return json.loads(stripped)
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError as e:
+            raise SystemExit(f"Invalid inline JSON: {e}") from e
     potential_path = Path(value)
     if potential_path.exists():
-        return json.loads(potential_path.read_text(encoding="utf-8"))
-    return json.loads(value)
+        try:
+            return json.loads(potential_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise SystemExit(f"Invalid JSON in {potential_path}: {e}") from e
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        raise SystemExit(f"Invalid JSON: neither inline JSON, valid file path, nor valid JSON string: {value[:100]}...")
+
+
+def _normalize_string(value: str) -> str:
+    return value.strip()
 
 
 def dedupe(items):
@@ -61,7 +65,7 @@ def dedupe(items):
         if item is None:
             continue
         if isinstance(item, str):
-            normalized = item.strip()
+            normalized = _normalize_string(item)
             if not normalized or normalized in seen:
                 continue
             seen.add(normalized)
@@ -80,7 +84,7 @@ def ensure_list(value):
     if isinstance(value, list):
         return [item for item in value if item not in (None, "")]
     if isinstance(value, str):
-        stripped = value.strip()
+        stripped = _normalize_string(value)
         return [stripped] if stripped else []
     return [value]
 
